@@ -127,8 +127,8 @@ class PanaromaStitcher():
             @ self.single_weights_array(shape[1])[:, np.newaxis].T
         )
     
-    def compute_homography(self, path, a, b, cylinder_warp, focal_length, verbose = False):
-        all_images = sorted(glob.glob(path+os.sep+'*'))
+    def compute_homography(self, path, a, b, cylinder_warp = False, focal_length = 800, verbose=False):
+        all_images = sorted(glob.glob(path + os.sep + '*'))
         if verbose:
             print('Found {} Images for stitching'.format(len(all_images)))
 
@@ -149,27 +149,22 @@ class PanaromaStitcher():
         bf = cv2.BFMatcher()
         matches = bf.knnMatch(images_with_sift[query_image_idx][1], images_with_sift[train_image_idx][1], k=2)
         # Ratio Test
-        good = []
-        for m,n in matches:
-            if m.distance < 0.75*n.distance:
-                good.append(m)
+        good = [m for m, n in matches if m.distance < 0.75 * n.distance]
         if verbose:
             print('Feature Matching Done')
 
-        # Feature Coodinates Extraction 
-        query_coords = []
-        train_coords = []
-        for i in range(len(good)):
-            query_coords.append(images_with_sift[query_image_idx][0][good[i].queryIdx].pt)
-            train_coords.append(images_with_sift[train_image_idx][0][good[i].trainIdx].pt)
+        # Feature Coordinates Extraction
+        query_coords = np.array([images_with_sift[query_image_idx][0][m.queryIdx].pt for m in good])
+        train_coords = np.array([images_with_sift[train_image_idx][0][m.trainIdx].pt for m in good])
         if verbose:
             print('Feature Coordinates Extraction Done')
 
         # Homography Estimation
-        H = self.RANSAC(query_coords, train_coords, epsilon = 5.0, s = 4, N = 1000)
+        H = self.RANSAC(query_coords, train_coords, epsilon=5.0, s=4, N=1000)
         if verbose:
             print('Homography Estimation Done')
-        return  H
+        return H
+
 
     def stitch_images(self, H_matrices, images, reference_image_idx):
         
@@ -328,10 +323,10 @@ class PanaromaStitcher():
 
         return final_stitched_img    
     
-    def make_panaroma_for_images_in(self, path, reference_image_idx = 2, cylinder_warp = True, focal_length_ratio = 2):
+    def make_panaroma_for_images_in(self, path, reference_image_idx = 2, cylinder_warp = False, focal_length = 800):
         H_matrices = []
         for i in range(len(os.listdir(path))-1):
-            H = self.compute_homography(path, i, i+1, cylinder_warp, focal_length_ratio, verbose = False)
+            H = self.compute_homography(path, i, i+1, cylinder_warp, focal_length, verbose = False)
             H_matrices.append(H)
         
         all_images = sorted(glob.glob(path+os.sep+'*'))
@@ -339,7 +334,7 @@ class PanaromaStitcher():
         for i in range(len(all_images)):
             img = cv2.imread(all_images[i])
             if cylinder_warp:
-                img = self.cylindrical_warp(img, focal_length_ratio)
+                img = self.cylindrical_warp(img, focal_length)
             images.append(img)
         
         self.final_stitch = self.stitch_images(H_matrices, images, reference_image_idx)
@@ -348,5 +343,8 @@ class PanaromaStitcher():
 
 if __name__ == '__main__':
     ps = PanaromaStitcher()
-    final_stitch, H_matrices = ps.make_panaroma_for_images_in('../../Images/I6', reference_image_idx=2, cylinder_warp = True, focal_length_ratio=2)
-    # ps.plot_image(ps.final_stitch, figsize=(20,10))
+    path = "../../Images/I3"
+    save_path = "../../"
+    final_stitch, H_matrices = ps.make_panaroma_for_images_in(path, reference_image_idx=2, cylinder_warp = True, focal_length=600)
+    ps.plot_image(ps.final_stitch, figsize=(20,10))
+    plt.imsave(save_path+'I3.png', cv2.cvtColor(final_stitch, cv2.COLOR_BGR2RGB))

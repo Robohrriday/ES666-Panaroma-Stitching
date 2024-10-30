@@ -33,7 +33,7 @@ class PanaromaStitcher():
         plt.axis('off')
         plt.show()
 
-    def cylindrical_warp(self, image, ratio=0.85):
+    def cylindrical_warp(self, image, focal_length):
         """
         References: 
         https://courses.cs.washington.edu/courses/cse576/08sp/lectures/Stitching.pdf
@@ -41,7 +41,6 @@ class PanaromaStitcher():
         """
         h, w = image.shape[:2]
         x_c, y_c = w // 2, h // 2
-        focal_length = ratio*w
 
         u, v = np.meshgrid(np.arange(w), np.arange(h))
 
@@ -128,7 +127,7 @@ class PanaromaStitcher():
             @ self.single_weights_array(shape[1])[:, np.newaxis].T
         )
     
-    def compute_homography(self, path, a, b, cylinder_warp, ratio, verbose = False):
+    def compute_homography(self, path, a, b, cylinder_warp, focal_length, verbose = False):
         all_images = sorted(glob.glob(path+os.sep+'*'))
         if verbose:
             print('Found {} Images for stitching'.format(len(all_images)))
@@ -141,7 +140,7 @@ class PanaromaStitcher():
         for i in range(len(all_images)):
             img = cv2.imread(all_images[i])
             if cylinder_warp:
-                img = self.cylindrical_warp(img, ratio)
+                img = self.cylindrical_warp(img, focal_length)
             images_with_sift.append(self.detect_sift_features(img))
         if verbose:
             print('Feature Detection Done')
@@ -153,7 +152,7 @@ class PanaromaStitcher():
         good = []
         for m,n in matches:
             if m.distance < 0.75*n.distance:
-                good.append([m])
+                good.append(m)
         if verbose:
             print('Feature Matching Done')
 
@@ -161,8 +160,8 @@ class PanaromaStitcher():
         query_coords = []
         train_coords = []
         for i in range(len(good)):
-            query_coords.append(images_with_sift[query_image_idx][0][good[i][0].queryIdx].pt)
-            train_coords.append(images_with_sift[train_image_idx][0][good[i][0].trainIdx].pt)
+            query_coords.append(images_with_sift[query_image_idx][0][good[i].queryIdx].pt)
+            train_coords.append(images_with_sift[train_image_idx][0][good[i].trainIdx].pt)
         if verbose:
             print('Feature Coordinates Extraction Done')
 
@@ -203,12 +202,13 @@ class PanaromaStitcher():
                 train_warped = cv2.warpPerspective(left_stitched_img, left_translation_matrices[-1] @ H, (max_x-min_x, max_y-min_y))
             query_warped = cv2.warpPerspective(images[i+1], left_translation_matrices[-1], (max_x-min_x, max_y-min_y))
 
-            mask = self.single_weights_matrix(images[0].shape[:2])
+            mask1 = self.single_weights_matrix(images[i].shape[:2])
+            mask2 = self.single_weights_matrix(images[i+1].shape[:2])
             if i != 0:
                 train_mask = cv2.warpPerspective(left_weight_matrix, left_translation_matrices[-1] @ H @ np.linalg.inv(left_translation_matrices[-2]), (max_x-min_x, max_y-min_y))
             else:
-                train_mask = cv2.warpPerspective(mask, left_translation_matrices[-1] @ H, (max_x-min_x, max_y-min_y))
-            query_mask = cv2.warpPerspective(mask, left_translation_matrices[-1], (max_x-min_x, max_y-min_y))
+                train_mask = cv2.warpPerspective(mask1, left_translation_matrices[-1] @ H, (max_x-min_x, max_y-min_y))
+            query_mask = cv2.warpPerspective(mask2, left_translation_matrices[-1], (max_x-min_x, max_y-min_y))
             
             train_mask = (train_mask/train_mask.max()).astype(np.float32)
             query_mask = (query_mask/query_mask.max()).astype(np.float32)
@@ -251,12 +251,13 @@ class PanaromaStitcher():
                 train_warped = cv2.warpPerspective(right_stitched_img, right_translation_matrices[-1] @ H, (max_x-min_x, max_y-min_y))
             query_warped = cv2.warpPerspective(images[i], right_translation_matrices[-1], (max_x-min_x, max_y-min_y))
             
-            mask = self.single_weights_matrix(images[-1].shape[:2])
+            mask1 = self.single_weights_matrix(images[i+1].shape[:2])
+            mask2 = self.single_weights_matrix(images[i].shape[:2])
             if i != len(H_matrices)-1:
                 train_mask = cv2.warpPerspective(right_weight_matrix, right_translation_matrices[-1] @ H @ np.linalg.inv(right_translation_matrices[-2]), (max_x-min_x, max_y-min_y))
             else:
-                train_mask = cv2.warpPerspective(mask, right_translation_matrices[-1] @ H, (max_x-min_x, max_y-min_y))
-            query_mask = cv2.warpPerspective(mask, right_translation_matrices[-1], (max_x-min_x, max_y-min_y))
+                train_mask = cv2.warpPerspective(mask1, right_translation_matrices[-1] @ H, (max_x-min_x, max_y-min_y))
+            query_mask = cv2.warpPerspective(mask2, right_translation_matrices[-1], (max_x-min_x, max_y-min_y))
             
             train_mask = (train_mask/train_mask.max()).astype(np.float32)
             query_mask = (query_mask/query_mask.max()).astype(np.float32)

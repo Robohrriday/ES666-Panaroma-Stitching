@@ -5,8 +5,6 @@ import importlib
 import os
 import cv2
 
-
-
 ### Change path to images here
 path = 'Images{}*'.format(os.sep)  # Use os.sep, Windows, linux have different path delimiters
 ###
@@ -25,9 +23,11 @@ for idx,algo in enumerate(all_submissions):
         inst = PanaromaStitcher()
 
         ###
+        focal_length_ratios = {'I1':2, 'I2':1.2, 'I3':1, 'I4':2, 'I5':2, 'I6':2}
+        cylindrical_warping = {'I1':False, 'I2':True, 'I3':True, 'I4':False, 'I5':False, 'I6':False}
         for impaths in glob.glob(path):
             print('\t\t Processing... {}'.format(impaths))
-            stitched_image, homography_matrix_list = inst.make_panaroma_for_images_in(path=impaths)
+            stitched_image, homography_matrix_list = inst.make_panaroma_for_images_in(path=impaths, focal_length_ratio = focal_length_ratios[impaths[-2:]])
 
             outfile =  './results/{}/{}.png'.format(impaths.split(os.sep)[-1],spec.name)
             os.makedirs(os.path.dirname(outfile),exist_ok=True)

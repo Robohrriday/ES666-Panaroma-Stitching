@@ -343,8 +343,9 @@ class PanaromaStitcher():
         
         self.final_stitch = self.stitch_images(H_matrices, images, reference_image_idx)
         self.H_matrices = H_matrices
+        return self.final_stitch, self.H_matrices
 
 if __name__ == '__main__':
     ps = PanaromaStitcher()
-    ps.make_panaroma_for_images_in('../../Images/I6', reference_image_idx=2, cylinder_warp = True, focal_length_ratio=2)
+    final_stitch, H_matrices = ps.make_panaroma_for_images_in('../../Images/I6', reference_image_idx=2, cylinder_warp = True, focal_length_ratio=2)
     # ps.plot_image(ps.final_stitch, figsize=(20,10))
